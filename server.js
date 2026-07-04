@@ -197,6 +197,39 @@ function stopRecording() {
   return { ok: true, file: state.file ? path.basename(state.file) : null };
 }
 
+function readBody(req, limitBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (d) => {
+      size += d.length;
+      if (size > limitBytes) {
+        reject(new Error('Body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(d);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+// Settings the admin portal is allowed to change
+const ADMIN_KEYS = [
+  'eventTitle', 'dateBanner', 'promptIdle', 'promptRecording',
+  'videoDevice', 'audioDevice', 'resolution', 'framerate',
+  'filenamePrefix', 'preview',
+];
+
+function photoVersion() {
+  try {
+    return Math.floor(fs.statSync(path.join(ROOT, 'public', 'photo.jpg')).mtimeMs);
+  } catch (_) {
+    return 0;
+  }
+}
+
 function listDevices(cb) {
   const proc = spawn('ffmpeg', ['-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'], {
     windowsHide: true,
@@ -242,6 +275,7 @@ function sendJson(res, status, obj) {
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
+  if (urlPath === '/admin') urlPath = '/admin.html';
   const filePath = path.join(ROOT, 'public', path.normalize(urlPath));
   if (!filePath.startsWith(path.join(ROOT, 'public'))) {
     res.writeHead(403);
@@ -268,7 +302,46 @@ const server = http.createServer((req, res) => {
       promptIdle: config.promptIdle,
       promptRecording: config.promptRecording,
       preview: config.preview,
+      photoVersion: photoVersion(),
     });
+  }
+
+  if (url === '/api/admin/config' && req.method === 'GET') {
+    config = loadConfig();
+    const out = {};
+    for (const k of ADMIN_KEYS) out[k] = config[k];
+    return sendJson(res, 200, out);
+  }
+
+  if (url === '/api/admin/config' && req.method === 'POST') {
+    return readBody(req, 1024 * 1024)
+      .then((body) => {
+        const incoming = JSON.parse(body.toString('utf8'));
+        const current = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+        for (const k of ADMIN_KEYS) {
+          if (k in incoming) current[k] = incoming[k];
+        }
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(current, null, 2) + '\n');
+        config = loadConfig();
+        console.log('[kiosk] settings updated via admin portal');
+        sendJson(res, 200, { ok: true });
+      })
+      .catch((err) => sendJson(res, 400, { ok: false, error: err.message }));
+  }
+
+  if (url === '/api/admin/photo' && req.method === 'POST') {
+    return readBody(req, 30 * 1024 * 1024)
+      .then((body) => {
+        const isJpeg = body[0] === 0xff && body[1] === 0xd8;
+        const isPng = body[0] === 0x89 && body[1] === 0x50;
+        if (!isJpeg && !isPng) {
+          return sendJson(res, 400, { ok: false, error: 'Please upload a JPEG or PNG image' });
+        }
+        fs.writeFileSync(path.join(ROOT, 'public', 'photo.jpg'), body);
+        console.log('[kiosk] photo updated via admin portal');
+        sendJson(res, 200, { ok: true, photoVersion: photoVersion() });
+      })
+      .catch((err) => sendJson(res, 400, { ok: false, error: err.message }));
   }
 
   if (url === '/api/status' && req.method === 'GET') {

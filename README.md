@@ -35,6 +35,17 @@ The tablet never records anything itself — it is purely a remote control. FFmp
 
 Recordings land in `recordings\memory_YYYY-MM-DD_HH-MM-SS.mp4`, one file per guest.
 
+## Admin portal
+
+Open `http://<PC-IP>:8080/admin` from any browser on the network (the PC itself works: `http://localhost:8080/admin`). From there you can:
+
+- edit the event title, date banner, and both prompts
+- upload/replace the kiosk photo (JPEG or PNG)
+- switch the camera or microphone from dropdowns of detected devices — the easiest way to swap to the handheld mic mid-event
+- toggle the live tablet preview
+
+Changes save to `config.json` and show up on the kiosk within ~10 seconds; device changes apply to the next recording. There is no password — anyone on the kiosk's network can open it, which is fine for a private event network (USB tethering makes it reachable only from the tablet and the PC).
+
 ## Switching to the handheld microphone
 
 If the Kiyo's built-in mic sounds bad on the test clip:
