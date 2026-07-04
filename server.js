@@ -28,8 +28,9 @@ function loadConfig() {
     recordingsDir: 'recordings',
     filenamePrefix: 'memory',
     preview: true,
-    previewFps: 10,
-    previewWidth: 640,
+    previewFps: 15,
+    previewWidth: 480,
+    photoPosition: 20,
     ...cfg,
   };
 }
@@ -76,6 +77,7 @@ function buildFfmpegArgs(outFile) {
     '-hide_banner',
     '-loglevel', 'warning',
     '-y',
+    '-fflags', 'nobuffer',
     '-f', 'dshow',
     '-rtbufsize', '512M',
     '-framerate', String(config.framerate),
@@ -100,7 +102,7 @@ function buildFfmpegArgs(outFile) {
       '-map', '0:v',
       '-vf', `fps=${config.previewFps},scale=${config.previewWidth}:-2`,
       '-c:v', 'mjpeg',
-      '-q:v', '8',
+      '-q:v', '10',
       '-f', 'mjpeg',
       'pipe:1'
     );
@@ -219,7 +221,7 @@ function readBody(req, limitBytes) {
 const ADMIN_KEYS = [
   'eventTitle', 'dateBanner', 'promptIdle', 'promptRecording',
   'videoDevice', 'audioDevice', 'resolution', 'framerate',
-  'filenamePrefix', 'preview',
+  'filenamePrefix', 'preview', 'photoPosition', 'previewFps', 'previewWidth',
 ];
 
 function photoVersion() {
@@ -302,6 +304,7 @@ const server = http.createServer((req, res) => {
       promptIdle: config.promptIdle,
       promptRecording: config.promptRecording,
       preview: config.preview,
+      photoPosition: config.photoPosition,
       photoVersion: photoVersion(),
     });
   }

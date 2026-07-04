@@ -11,6 +11,7 @@
   "promptIdle": "Leave a video message of your favorite Jack & Linda memory to share with them",
   "promptRecording": "Introduce yourselves and share your favorite Jack & Linda memory with them! Press Stop when you are done.",
   "preview": true,
-  "previewFps": 10,
-  "previewWidth": 640
+  "previewFps": 15,
+  "previewWidth": 480,
+  "photoPosition": 20
 }
