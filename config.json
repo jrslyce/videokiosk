@@ -1,0 +1,16 @@
+{
+  "port": 8080,
+  "videoDevice": "Razer Kiyo",
+  "audioDevice": "Microphone (Razer Kiyo)",
+  "resolution": "1920x1080",
+  "framerate": 30,
+  "recordingsDir": "recordings",
+  "filenamePrefix": "memory",
+  "eventTitle": "Jack & Linda’s Golden 50th Anniversary",
+  "dateBanner": "May 14th, 1976",
+  "promptIdle": "Leave a video message of your favorite Jack & Linda memory to share with them",
+  "promptRecording": "Introduce yourselves and share your favorite Jack & Linda memory with them! Press Stop when you are done.",
+  "preview": true,
+  "previewFps": 10,
+  "previewWidth": 640
+}
