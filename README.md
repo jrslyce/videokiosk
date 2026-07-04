@@ -48,15 +48,31 @@ Tip: record a test with each mic (`scripts\test-recording.bat`, editing the `AUD
 
 ## Tablet setup (Android)
 
+### Option A — USB-C cable (recommended)
+
+If the tablet is plugged into the PC via USB-C, use **USB tethering** for a rock-solid connection that doesn't depend on venue Wi-Fi at all (it also keeps the tablet charged):
+
+1. Plug the tablet into the PC with the USB-C cable.
+2. On the tablet: **Settings → Network & internet → Hotspot & tethering → USB tethering → On** (the toggle only appears while the cable is connected; the tablet does *not* need internet for this).
+3. On the PC, run `ipconfig` and find the new adapter (usually **"Ethernet adapter … Remote NDIS"**). Note its IPv4 address, e.g. `192.168.42.79`.
+4. On the tablet, open Chrome and go to `http://<that-IP>:8080`, e.g. `http://192.168.42.79:8080`.
+5. When Windows asks, allow Node.js through the firewall for this network. If the page won't load, the tether network may be flagged Public — either allow Node on Public too, or set the network to Private.
+
+The tether IP can change between reconnects, so plug in and verify the address before the event starts.
+
+### Option B — Wi-Fi
+
 1. Connect the tablet to the **same Wi-Fi network** as the PC.
 2. Find the PC's LAN IP: run `ipconfig` on the PC (e.g. `192.168.1.50`).
 3. Open Chrome on the tablet and go to `http://192.168.1.50:8080`.
-4. Make it kiosk-like:
+4. Give the PC a static IP or a DHCP reservation on your router so the address doesn't change mid-event.
+
+### Either way — make it kiosk-like
+
+1. Kiosk mode:
    - Chrome menu → **Add to Home screen** → open from the icon (fullscreen), or
    - use the free **Fully Kiosk Browser** app for true locked-down kiosk mode (recommended for events — it blocks the home button and keeps the screen awake).
-5. Set the tablet display timeout to *never* (the page also requests a wake lock).
-
-Give the PC a static IP or a DHCP reservation on your router so the address doesn't change mid-event.
+2. Set the tablet display timeout to *never* (the page also requests a wake lock).
 
 ## Guest flow
 
