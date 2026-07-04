@@ -29,7 +29,7 @@ function loadConfig() {
     filenamePrefix: 'memory',
     preview: true,
     previewFps: 15,
-    previewWidth: 480,
+    previewWidth: 768,
     photoPosition: 20,
     ...cfg,
   };
