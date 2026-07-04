@@ -264,6 +264,9 @@
     if (c.promptIdle) { cfg.promptIdle = c.promptIdle; if (!recording) $('prompt').textContent = c.promptIdle; }
     if (c.promptRecording) { cfg.promptRecording = c.promptRecording; if (recording) $('prompt').textContent = c.promptRecording; }
     if (typeof c.preview === 'boolean') cfg.preview = c.preview;
+    if (typeof c.photoPosition !== 'undefined') {
+      $('photo').style.backgroundPosition = 'center ' + c.photoPosition + '%';
+    }
     if (typeof c.photoVersion !== 'undefined' && c.photoVersion !== photoVersion) {
       photoVersion = c.photoVersion;
       if (c.photoVersion > 0) {

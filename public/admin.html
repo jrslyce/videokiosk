@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Video Kiosk — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&amp;family=Dancing+Script:wght@600&amp;display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #0a0a0a; color: #f2f0ec; font-family: Helvetica, Arial, sans-serif;
@@ -36,9 +36,33 @@
   .toast { font-size: 14px; }
   .toast.ok { color: #8fce8f; }
   .toast.err { color: #e67c7c; }
-  .photo-preview { width: 100%; max-height: 260px; object-fit: cover; border-radius: 10px;
-                   border: 1px solid #322c23; display: block; margin-bottom: 10px; background: #16130f; }
   .warn { color: #8b857b; font-size: 12px; margin-top: 6px; }
+
+  /* ---- Miniature kiosk screen mockup ---- */
+  .mock { display: flex; width: 100%; aspect-ratio: 3 / 2; border: 1px solid #322c23;
+          border-radius: 10px; overflow: hidden; background: #0a0a0a; margin-bottom: 12px; }
+  .mock-left { flex: 0 0 62%; display: flex; flex-direction: column; background: #141210; }
+  .mock-photo { flex: 1; min-height: 0; background-color: #1c1815;
+                background-size: cover; background-position: center 20%;
+                background-image: radial-gradient(ellipse at center, #2a241c 0%, #141210 70%); }
+  .mock-banner { flex: 0 0 auto; background: linear-gradient(180deg, #f4e9d3, #eaddc2);
+                 text-align: center; padding: 4px 6px; }
+  .mock-banner span { font-family: 'Dancing Script', cursive; font-size: 15px; color: #a4813d;
+                      font-weight: 600; line-height: 1; }
+  .mock-right { flex: 1; display: flex; flex-direction: column; align-items: center;
+                justify-content: space-between; padding: 14px 10px; background: #0a0a0a; }
+  .mock-title { font-family: 'Playfair Display', Georgia, serif; color: #c3a878; font-size: 12px;
+                text-align: center; line-height: 1.35; font-weight: 500; }
+  .mock-prompt { color: #f2f0ec; font-size: 9px; line-height: 1.5; text-align: center; }
+  .mock-controls { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .mock-btn { width: 44px; height: 44px; border-radius: 50%; background: #e63030;
+              border: 2px solid #f5f5f5; box-shadow: 0 0 0 2px #0a0a0a, 0 2px 10px rgba(230,48,48,0.35);
+              color: #fff; font-size: 6.5px; font-weight: 700; letter-spacing: 0.5px;
+              display: flex; align-items: center; justify-content: center; }
+  .mock-timer { color: #cfc9bf; font-size: 9px; letter-spacing: 1px; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  .slider-row input[type=range] { flex: 1; accent-color: #c3a878; }
+  .slider-row .val { color: #cfc9bf; font-size: 13px; min-width: 90px; text-align: right; }
   a { color: #c3a878; }
 </style>
 </head>
@@ -57,9 +81,28 @@
   <label for="promptRecording">Instruction during countdown &amp; recording</label>
   <textarea id="promptRecording"></textarea>
 
-  <h2>Photo</h2>
-  <img id="photoPreview" class="photo-preview" alt="Current kiosk photo">
-  <div class="row">
+  <h2>Photo &amp; screen preview</h2>
+  <div class="mock" id="mock">
+    <div class="mock-left">
+      <div class="mock-photo" id="mockPhoto"></div>
+      <div class="mock-banner"><span id="mockBanner">May 14th, 1976</span></div>
+    </div>
+    <div class="mock-right">
+      <div class="mock-title" id="mockTitle">Jack &amp; Linda&rsquo;s Golden 50th Anniversary</div>
+      <div class="mock-prompt" id="mockPrompt"></div>
+      <div class="mock-controls">
+        <div class="mock-btn">RECORD</div>
+        <div class="mock-timer">00:00</div>
+      </div>
+    </div>
+  </div>
+  <label>Photo vertical position — drag until faces are framed nicely</label>
+  <div class="slider-row">
+    <input type="range" id="photoPosition" min="0" max="100" step="1" value="20">
+    <span class="val" id="photoPositionVal">20% from top</span>
+  </div>
+  <div class="warn">0% pins the top of the photo in view, 100% the bottom. Preview above shows the exact crop the kiosk uses.</div>
+  <div class="row" style="margin-top:16px">
     <input type="file" id="photoFile" accept="image/jpeg,image/png">
     <button class="secondary" id="uploadPhoto">Upload photo</button>
   </div>
@@ -123,20 +166,39 @@
     }).catch(function () { say('Could not scan devices', false); });
   }
 
+  // ---- Live kiosk mockup ----
+  function updateMock() {
+    $('mockTitle').textContent = $('eventTitle').value || '';
+    $('mockBanner').textContent = $('dateBanner').value || '';
+    $('mockPrompt').textContent = $('promptIdle').value || '';
+    var pos = $('photoPosition').value;
+    $('mockPhoto').style.backgroundPosition = 'center ' + pos + '%';
+    $('photoPositionVal').textContent = pos + '% from top';
+  }
+  ['eventTitle', 'dateBanner', 'promptIdle'].forEach(function (f) {
+    $(f).addEventListener('input', updateMock);
+  });
+  $('photoPosition').addEventListener('input', updateMock);
+
   function refreshPhoto() {
-    $('photoPreview').src = '/photo.jpg?t=' + Date.now();
+    var probe = new Image();
+    var url = '/photo.jpg?t=' + Date.now();
+    probe.onload = function () {
+      $('mockPhoto').style.backgroundImage = "url('" + url + "')";
+    };
+    probe.src = url;
   }
 
   fetch('/api/admin/config').then(function (r) { return r.json(); }).then(function (c) {
     current = c;
     FIELDS.forEach(function (f) { $(f).value = c[f] || ''; });
     $('preview').checked = !!c.preview;
+    $('photoPosition').value = (typeof c.photoPosition === 'number') ? c.photoPosition : 20;
+    updateMock();
     loadDevices();
   }).catch(function () { say('Could not load settings — is the server running?', false); });
 
   refreshPhoto();
-  $('photoPreview').onerror = function () { this.style.display = 'none'; };
-  $('photoPreview').onload = function () { this.style.display = 'block'; };
 
   $('refreshDevices').addEventListener('click', loadDevices);
 
@@ -160,6 +222,7 @@
     body.videoDevice = $('videoDevice').value || current.videoDevice;
     body.audioDevice = $('audioDevice').value || current.audioDevice;
     body.preview = $('preview').checked;
+    body.photoPosition = Number($('photoPosition').value);
     $('save').disabled = true;
     fetch('/api/admin/config', {
       method: 'POST',
