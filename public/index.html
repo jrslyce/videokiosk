@@ -255,14 +255,26 @@
     }
   });
 
-  // ---- Load config (titles/prompts) from the server ----
-  api('/api/config').then(function (c) {
+  // ---- Load config (titles/prompts/photo) from the server ----
+  var photoVersion = null;
+
+  function applyConfig(c) {
     if (c.eventTitle) $('eventTitle').textContent = c.eventTitle;
     if (c.dateBanner) $('dateBanner').textContent = c.dateBanner;
     if (c.promptIdle) { cfg.promptIdle = c.promptIdle; if (!recording) $('prompt').textContent = c.promptIdle; }
-    if (c.promptRecording) cfg.promptRecording = c.promptRecording;
+    if (c.promptRecording) { cfg.promptRecording = c.promptRecording; if (recording) $('prompt').textContent = c.promptRecording; }
     if (typeof c.preview === 'boolean') cfg.preview = c.preview;
-  }).catch(function () {});
+    if (typeof c.photoVersion !== 'undefined' && c.photoVersion !== photoVersion) {
+      photoVersion = c.photoVersion;
+      if (c.photoVersion > 0) {
+        $('photo').style.backgroundImage = "url('photo.jpg?v=" + c.photoVersion + "')";
+      }
+    }
+  }
+
+  function refreshConfig() { api('/api/config').then(applyConfig).catch(function () {}); }
+  refreshConfig();
+  setInterval(refreshConfig, 10000); // picks up admin-portal changes live
 
   // ---- Stay in sync with the server (handles refreshes / restarts) ----
   setInterval(function () {
