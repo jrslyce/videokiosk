@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Video Kiosk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&amp;family=Dancing+Script:wght@600&amp;display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden;
+               font-family: Helvetica, Arial, sans-serif; user-select: none; }
+
+  @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @keyframes popIn { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+  .kiosk { display: flex; width: 100vw; height: 100vh; background: #0a0a0a; overflow: hidden; }
+
+  /* ---- Left: photo / live feed ---- */
+  .left { flex: 0 0 62%; position: relative; display: flex; flex-direction: column; background: #141210; }
+  .photo { flex: 1; min-height: 0; background-color: #1c1815;
+           background-image: url('photo.jpg');
+           background-size: cover; background-position: center 20%; }
+  .banner { flex: 0 0 auto; background: linear-gradient(180deg, #f4e9d3, #eaddc2);
+            padding: clamp(10px, 2vh, 22px) 24px; text-align: center; }
+  .banner span { font-family: 'Dancing Script', cursive; font-size: clamp(26px, 5vh, 52px);
+                 color: #a4813d; line-height: 1; font-weight: 600; }
+  .live { flex: 1; min-height: 0; position: relative; background: #000; display: none; }
+  .live img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .rec-badge { position: absolute; top: 24px; left: 24px; display: flex; align-items: center; gap: 10px;
+               background: rgba(0,0,0,0.55); border-radius: 999px; padding: 8px 18px 8px 12px; }
+  .rec-dot { width: 14px; height: 14px; border-radius: 50%; background: #e63030;
+             animation: pulseDot 1.2s ease-in-out infinite; }
+  .rec-badge b { color: #fff; font-size: 20px; letter-spacing: 2px; font-weight: 700; }
+  .live-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+              color: #b9a887; font-size: 22px; text-align: center; padding: 40px; }
+
+  .kiosk.recording .photo, .kiosk.recording .banner { display: none; }
+  .kiosk.recording .live { display: block; }
+
+  /* ---- Right: panel ---- */
+  .right { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center;
+           justify-content: space-between;
+           padding: clamp(20px, 5vh, 64px) clamp(20px, 3vw, 48px) clamp(18px, 4.5vh, 56px);
+           background: #0a0a0a; }
+  .title { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(20px, 3.9vh, 42px);
+           line-height: 1.35; color: #c3a878; text-align: center; font-weight: 500; }
+  .prompt { color: #f2f0ec; font-size: clamp(16px, 2.8vh, 30px); line-height: 1.5;
+            text-align: center; max-width: 460px; }
+  .controls { display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 2.5vh, 28px); }
+  .rec-btn { width: clamp(110px, 22vh, 240px); height: clamp(110px, 22vh, 240px); border-radius: 50%;
+             background: #e63030; border: 4px solid #f5f5f5;
+             box-shadow: 0 0 0 6px #0a0a0a, 0 8px 40px rgba(230,48,48,0.35);
+             color: #fff; font-size: clamp(20px, 4vh, 40px); font-weight: 700; letter-spacing: 1px;
+             cursor: pointer; font-family: Helvetica, Arial, sans-serif; line-height: 1.25; padding: 8px; }
+  .rec-btn:active { transform: scale(0.97); }
+  .kiosk.recording .rec-btn { background: #8a1717; font-size: clamp(15px, 3vh, 30px); }
+  .timer { color: #cfc9bf; font-size: clamp(16px, 2.8vh, 30px); font-variant-numeric: tabular-nums;
+           letter-spacing: 2px; }
+  .error { color: #e67c7c; font-size: clamp(13px, 2vh, 18px); text-align: center; min-height: 1.4em;
+           max-width: 460px; }
+
+  /* ---- Countdown overlay ---- */
+  .overlay { position: fixed; inset: 0; background: rgba(5,5,5,0.94); z-index: 50;
+             display: none; flex-direction: column; align-items: center; justify-content: center;
+             text-align: center; padding: 5vw; gap: clamp(16px, 4vh, 48px); }
+  .overlay.show { display: flex; }
+  .count { font-size: clamp(120px, 38vh, 420px); font-weight: 800; color: #fff; line-height: 1;
+           font-family: Helvetica, Arial, sans-serif; }
+  .count.start { color: #e63030; font-size: clamp(80px, 26vh, 300px); }
+  .count.animate { animation: popIn 0.45s ease-out; }
+  .overlay .instruction { color: #f2f0ec; font-size: clamp(20px, 3.6vh, 40px); line-height: 1.5;
+                          max-width: 900px; }
+
+  /* ---- Thank-you overlay ---- */
+  .thanks { position: fixed; inset: 0; background: rgba(5,5,5,0.94); z-index: 50;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 5vw; gap: 24px; }
+  .thanks.show { display: flex; }
+  .thanks h1 { font-family: 'Playfair Display', Georgia, serif; color: #c3a878;
+               font-size: clamp(40px, 8vh, 90px); margin: 0; font-weight: 600; }
+  .thanks p { color: #f2f0ec; font-size: clamp(18px, 3vh, 32px); margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="kiosk" id="kiosk">
+  <div class="left">
+    <div class="photo" id="photo"></div>
+    <div class="banner"><span id="dateBanner">May 14th, 1976</span></div>
+    <div class="live" id="live">
+      <img id="previewImg" alt="">
+      <div class="rec-badge"><div class="rec-dot"></div><b>REC</b></div>
+      <div class="live-msg" id="liveMsg">Recording in progress&hellip;</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="title" id="eventTitle">Jack &amp; Linda&rsquo;s Golden 50th Anniversary</div>
+    <div class="prompt" id="prompt">Leave a video message of your favorite Jack &amp; Linda memory to share with them</div>
+    <div class="controls">
+      <button class="rec-btn" id="recBtn">RECORD</button>
+      <div class="timer" id="timer">00:00</div>
+      <div class="error" id="error"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="count" id="count">3</div>
+  <div class="instruction" id="instruction"></div>
+</div>
+
+<div class="thanks" id="thanks">
+  <h1>Thank you!</h1>
+  <p>Your memory has been saved for Jack &amp; Linda.</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var kiosk = $('kiosk'), recBtn = $('recBtn'), timerEl = $('timer'), errEl = $('error');
+  var overlay = $('overlay'), countEl = $('count'), instructionEl = $('instruction');
+  var thanks = $('thanks'), previewImg = $('previewImg'), liveMsg = $('liveMsg');
+
+  var cfg = {
+    promptIdle: $('prompt').textContent,
+    promptRecording: 'Introduce yourselves and share your favorite Jack & Linda memory with them! Press Stop when you are done.',
+    preview: true
+  };
+
+  var busy = false;          // guards against double-taps during transitions
+  var recording = false;
+  var startedAt = null;
+  var tickHandle = null;
+
+  function api(path, opts) {
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        j._status = r.status; return j;
+      });
+    });
+  }
+
+  function fmt(sec) {
+    var m = String(Math.floor(sec / 60)).padStart(2, '0');
+    var s = String(sec % 60).padStart(2, '0');
+    return m + ':' + s;
+  }
+
+  function setError(msg) { errEl.textContent = msg || ''; }
+
+  function tick() {
+    if (recording && startedAt) {
+      timerEl.textContent = fmt(Math.floor((Date.now() - startedAt) / 1000));
+    }
+  }
+
+  function enterRecordingUI() {
+    recording = true;
+    kiosk.classList.add('recording');
+    recBtn.textContent = 'STOP RECORDING';
+    $('prompt').textContent = cfg.promptRecording;
+    setError('');
+    if (cfg.preview) {
+      previewImg.src = '/preview.mjpg?t=' + Date.now();
+      previewImg.style.display = 'block';
+      liveMsg.style.display = 'none';
+      previewImg.onerror = function () {
+        previewImg.style.display = 'none';
+        liveMsg.style.display = 'flex';
+      };
+    } else {
+      previewImg.style.display = 'none';
+      liveMsg.style.display = 'flex';
+    }
+    if (!tickHandle) tickHandle = setInterval(tick, 250);
+  }
+
+  function exitRecordingUI() {
+    recording = false;
+    startedAt = null;
+    kiosk.classList.remove('recording');
+    recBtn.textContent = 'RECORD';
+    $('prompt').textContent = cfg.promptIdle;
+    timerEl.textContent = '00:00';
+    previewImg.src = '';
+    if (tickHandle) { clearInterval(tickHandle); tickHandle = null; }
+  }
+
+  // ---- Countdown: 3, 2, 1, Start! ----
+  function runCountdown() {
+    return new Promise(function (resolve) {
+      overlay.classList.add('show');
+      instructionEl.textContent = cfg.promptRecording;
+      var steps = ['3', '2', '1', 'Start!'];
+      var i = 0;
+
+      function show(step) {
+        countEl.textContent = step;
+        countEl.classList.toggle('start', step === 'Start!');
+        countEl.classList.remove('animate');
+        void countEl.offsetWidth; // restart animation
+        countEl.classList.add('animate');
+      }
+
+      show(steps[0]);
+      var iv = setInterval(function () {
+        i++;
+        if (i === 2) {
+          // Fire the start request while "1" is on screen so FFmpeg's
+          // spin-up time is hidden inside the countdown.
+          api('/api/record/start', { method: 'POST' }).then(function (r) {
+            if (!r.ok && r._status !== 409) {
+              setError(r.error || 'Could not start recording');
+            }
+          });
+        }
+        if (i < steps.length) {
+          show(steps[i]);
+        } else {
+          clearInterval(iv);
+          overlay.classList.remove('show');
+          resolve();
+        }
+      }, 1000);
+    });
+  }
+
+  recBtn.addEventListener('click', function () {
+    if (busy) return;
+    busy = true;
+
+    if (!recording) {
+      runCountdown().then(function () {
+        return api('/api/status');
+      }).then(function (st) {
+        if (st.recording) {
+          startedAt = Date.now() - (st.elapsed || 0) * 1000;
+          enterRecordingUI();
+        } else {
+          setError(st.error || 'Recording did not start — check the server window on the PC.');
+        }
+        busy = false;
+      }).catch(function () { busy = false; });
+    } else {
+      api('/api/record/stop', { method: 'POST' }).then(function () {
+        exitRecordingUI();
+        thanks.classList.add('show');
+        setTimeout(function () { thanks.classList.remove('show'); }, 3000);
+        busy = false;
+      }).catch(function () { busy = false; });
+    }
+  });
+
+  // ---- Load config (titles/prompts) from the server ----
+  api('/api/config').then(function (c) {
+    if (c.eventTitle) $('eventTitle').textContent = c.eventTitle;
+    if (c.dateBanner) $('dateBanner').textContent = c.dateBanner;
+    if (c.promptIdle) { cfg.promptIdle = c.promptIdle; if (!recording) $('prompt').textContent = c.promptIdle; }
+    if (c.promptRecording) cfg.promptRecording = c.promptRecording;
+    if (typeof c.preview === 'boolean') cfg.preview = c.preview;
+  }).catch(function () {});
+
+  // ---- Stay in sync with the server (handles refreshes / restarts) ----
+  setInterval(function () {
+    if (busy) return;
+    api('/api/status').then(function (st) {
+      if (st.recording && !recording) {
+        startedAt = Date.now() - (st.elapsed || 0) * 1000;
+        enterRecordingUI();
+      } else if (!st.recording && recording) {
+        exitRecordingUI();
+      }
+      if (st.error && !st.recording) setError(st.error);
+    }).catch(function () {});
+  }, 3000);
+
+  // ---- Keep the tablet awake while the page is open ----
+  function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').catch(function () {});
+    }
+  }
+  requestWakeLock();
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+
+  // Hide the photo area gracefully if photo.jpg is missing
+  var probe = new Image();
+  probe.onerror = function () {
+    $('photo').style.backgroundImage =
+      'radial-gradient(ellipse at center, #2a241c 0%, #141210 70%)';
+  };
+  probe.src = 'photo.jpg';
+})();
+</script>
+</body>
+</html>
