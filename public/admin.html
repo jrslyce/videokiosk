@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Video Kiosk — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&amp;family=Dancing+Script:wght@600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&amp;family=Dancing+Script:wght@600&amp;family=Great+Vibes&amp;family=Cormorant+Garamond:wght@500;600&amp;family=Lora:wght@500;600&amp;family=Montserrat:wght@500;600&amp;family=Cinzel:wght@500;600&amp;display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #0a0a0a; color: #f2f0ec; font-family: Helvetica, Arial, sans-serif;
@@ -80,6 +80,17 @@
   <textarea id="promptIdle"></textarea>
   <label for="promptRecording">Instruction during countdown &amp; recording</label>
   <textarea id="promptRecording"></textarea>
+  <div class="row" style="margin-top:14px">
+    <div>
+      <label for="titleFont" style="margin-top:0">Title font</label>
+      <select id="titleFont"></select>
+    </div>
+    <div style="flex:0 0 auto">
+      <label for="titleColor" style="margin-top:0">Title color</label>
+      <input type="color" id="titleColor" value="#c3a878"
+             style="width:64px;height:41px;padding:4px;background:#16130f;border:1px solid #322c23;border-radius:8px;cursor:pointer">
+    </div>
+  </div>
 
   <h2>Photo &amp; screen preview</h2>
   <div class="mock" id="mock">
@@ -134,6 +145,24 @@
   var FIELDS = ['eventTitle', 'dateBanner', 'promptIdle', 'promptRecording'];
   var current = {};
 
+  // name shown in the dropdown → CSS font-family stack used on the kiosk
+  var FONTS = {
+    'Playfair Display': "'Playfair Display', Georgia, serif",
+    'Cormorant Garamond': "'Cormorant Garamond', Georgia, serif",
+    'Cinzel': "'Cinzel', Georgia, serif",
+    'Lora': "'Lora', Georgia, serif",
+    'Dancing Script': "'Dancing Script', cursive",
+    'Great Vibes': "'Great Vibes', cursive",
+    'Montserrat': "'Montserrat', Helvetica, Arial, sans-serif",
+    'Helvetica': "Helvetica, Arial, sans-serif",
+  };
+  Object.keys(FONTS).forEach(function (name) {
+    var o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    o.style.fontFamily = FONTS[name];
+    $('titleFont').appendChild(o);
+  });
+
   function say(msg, ok) {
     toast.textContent = msg;
     toast.className = 'toast ' + (ok ? 'ok' : 'err');
@@ -169,6 +198,9 @@
   // ---- Live kiosk mockup ----
   function updateMock() {
     $('mockTitle').textContent = $('eventTitle').value || '';
+    $('mockTitle').style.fontFamily = FONTS[$('titleFont').value] || FONTS['Playfair Display'];
+    $('mockTitle').style.color = $('titleColor').value;
+    $('titleFont').style.fontFamily = FONTS[$('titleFont').value] || '';
     $('mockBanner').textContent = $('dateBanner').value || '';
     $('mockPrompt').textContent = $('promptIdle').value || '';
     var pos = $('photoPosition').value;
@@ -179,6 +211,8 @@
     $(f).addEventListener('input', updateMock);
   });
   $('photoPosition').addEventListener('input', updateMock);
+  $('titleFont').addEventListener('change', updateMock);
+  $('titleColor').addEventListener('input', updateMock);
 
   function refreshPhoto() {
     var probe = new Image();
@@ -194,6 +228,8 @@
     FIELDS.forEach(function (f) { $(f).value = c[f] || ''; });
     $('preview').checked = !!c.preview;
     $('photoPosition').value = (typeof c.photoPosition === 'number') ? c.photoPosition : 20;
+    if (c.titleFont && FONTS[c.titleFont]) $('titleFont').value = c.titleFont;
+    if (c.titleColor) $('titleColor').value = c.titleColor;
     updateMock();
     loadDevices();
   }).catch(function () { say('Could not load settings — is the server running?', false); });
@@ -223,6 +259,8 @@
     body.audioDevice = $('audioDevice').value || current.audioDevice;
     body.preview = $('preview').checked;
     body.photoPosition = Number($('photoPosition').value);
+    body.titleFont = $('titleFont').value;
+    body.titleColor = $('titleColor').value;
     $('save').disabled = true;
     fetch('/api/admin/config', {
       method: 'POST',

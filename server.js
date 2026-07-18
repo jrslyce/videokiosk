@@ -31,6 +31,8 @@ function loadConfig() {
     previewFps: 15,
     previewWidth: 768,
     photoPosition: 20,
+    titleFont: 'Playfair Display',
+    titleColor: '#c3a878',
     ...cfg,
   };
 }
@@ -57,6 +59,7 @@ const state = {
 
 const previewClients = new Set(); // http responses receiving MJPEG frames
 let previewBuffer = Buffer.alloc(0);
+let previewProc = null; // preview-only ffmpeg (camera adjustment screen)
 
 function timestampName() {
   const d = new Date();
@@ -130,8 +133,78 @@ function broadcastPreviewChunk(chunk) {
   }
 }
 
+// Preview-only ffmpeg for the camera-adjustment screen (no file written).
+function startPreview() {
+  if (state.recording) return { ok: false, error: 'Already recording' };
+  if (previewProc) return { ok: true };
+
+  config = loadConfig();
+  const args = [
+    '-hide_banner',
+    '-loglevel', 'warning',
+    '-fflags', 'nobuffer',
+    '-f', 'dshow',
+    '-rtbufsize', '128M',
+    '-framerate', String(config.framerate),
+    '-video_size', config.resolution,
+    '-i', `video=${config.videoDevice}`,
+    '-vf', `fps=${config.previewFps},scale=${config.previewWidth}:-2`,
+    '-c:v', 'mjpeg',
+    '-q:v', '10',
+    '-f', 'mjpeg',
+    'pipe:1',
+  ];
+
+  console.log('[kiosk] starting preview ffmpeg');
+  const proc = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  previewProc = proc;
+  previewBuffer = Buffer.alloc(0);
+
+  proc.stdout.on('data', broadcastPreviewChunk);
+  proc.on('exit', () => {
+    if (previewProc === proc) {
+      previewProc = null;
+      for (const res of previewClients) res.end();
+      previewClients.clear();
+    }
+  });
+  proc.on('error', (err) => {
+    if (previewProc === proc) previewProc = null;
+    state.lastError = `Could not start camera preview: ${err.message}. Is FFmpeg installed and on the PATH?`;
+    console.error('[kiosk] ' + state.lastError);
+  });
+
+  return { ok: true };
+}
+
+function stopPreview(cb) {
+  const proc = previewProc;
+  if (!proc) return cb();
+  let done = false;
+  const finish = () => {
+    if (!done) { done = true; cb(); }
+  };
+  proc.once('exit', finish);
+  try {
+    proc.stdin.write('q'); // graceful quit releases the camera cleanly
+  } catch (_) {
+    proc.kill('SIGKILL');
+  }
+  setTimeout(() => {
+    if (previewProc === proc) proc.kill('SIGKILL');
+    finish();
+  }, 1500);
+}
+
 function startRecording() {
   if (state.recording) return { ok: false, error: 'Already recording' };
+
+  // Safety net: the camera can only be opened by one process, so make sure
+  // any leftover adjustment preview is gone before recording starts.
+  if (previewProc) {
+    try { previewProc.kill('SIGKILL'); } catch (_) {}
+    previewProc = null;
+  }
 
   config = loadConfig(); // pick up config edits without restarting
   const outFile = path.join(RECORDINGS_DIR, timestampName());
@@ -222,6 +295,7 @@ const ADMIN_KEYS = [
   'eventTitle', 'dateBanner', 'promptIdle', 'promptRecording',
   'videoDevice', 'audioDevice', 'resolution', 'framerate',
   'filenamePrefix', 'preview', 'photoPosition', 'previewFps', 'previewWidth',
+  'titleFont', 'titleColor',
 ];
 
 function photoVersion() {
@@ -305,6 +379,8 @@ const server = http.createServer((req, res) => {
       promptRecording: config.promptRecording,
       preview: config.preview,
       photoPosition: config.photoPosition,
+      titleFont: config.titleFont,
+      titleColor: config.titleColor,
       photoVersion: photoVersion(),
     });
   }
@@ -357,6 +433,15 @@ const server = http.createServer((req, res) => {
     });
   }
 
+  if (url === '/api/preview/start' && req.method === 'POST') {
+    const result = startPreview();
+    return sendJson(res, result.ok ? 200 : 409, result);
+  }
+
+  if (url === '/api/preview/stop' && req.method === 'POST') {
+    return stopPreview(() => sendJson(res, 200, { ok: true }));
+  }
+
   if (url === '/api/record/start' && req.method === 'POST') {
     const result = startRecording();
     return sendJson(res, result.ok ? 200 : 409, result);
@@ -378,9 +463,9 @@ const server = http.createServer((req, res) => {
   }
 
   if (url === '/preview.mjpg' && req.method === 'GET') {
-    if (!state.recording) {
+    if (!state.recording && !previewProc) {
       res.writeHead(503);
-      return res.end('Not recording');
+      return res.end('Camera not active');
     }
     res.writeHead(200, {
       'Content-Type': 'multipart/x-mixed-replace; boundary=frame',

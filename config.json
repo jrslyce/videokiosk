@@ -1,7 +1,7 @@
 {
   "port": 8080,
-  "videoDevice": "Razer Kiyo",
-  "audioDevice": "Microphone (Razer Kiyo)",
+  "videoDevice": "Camera (NVIDIA Broadcast)",
+  "audioDevice": "Microphone (NVIDIA Broadcast)",
   "resolution": "1920x1080",
   "framerate": 30,
   "recordingsDir": "recordings",
@@ -13,5 +13,5 @@
   "preview": true,
   "previewFps": 15,
   "previewWidth": 768,
-  "photoPosition": 20
+  "photoPosition": 5
 }

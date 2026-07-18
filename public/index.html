@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Video Kiosk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&amp;family=Dancing+Script:wght@600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&amp;family=Dancing+Script:wght@600&amp;family=Great+Vibes&amp;family=Cormorant+Garamond:wght@500;600&amp;family=Lora:wght@500;600&amp;family=Montserrat:wght@500;600&amp;family=Cinzel:wght@500;600&amp;display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden;
@@ -50,16 +50,41 @@
             text-align: center; max-width: 460px; }
   .controls { display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 2.5vh, 28px); }
   .rec-btn { width: clamp(110px, 22vh, 240px); height: clamp(110px, 22vh, 240px); border-radius: 50%;
-             background: #e63030; border: 4px solid #f5f5f5;
-             box-shadow: 0 0 0 6px #0a0a0a, 0 8px 40px rgba(230,48,48,0.35);
+             background: #229a4d; border: 4px solid #f5f5f5;
+             box-shadow: 0 0 0 6px #0a0a0a, 0 8px 40px rgba(34,154,77,0.35);
              color: #fff; font-size: clamp(20px, 4vh, 40px); font-weight: 700; letter-spacing: 1px;
              cursor: pointer; font-family: Helvetica, Arial, sans-serif; line-height: 1.25; padding: 8px; }
   .rec-btn:active { transform: scale(0.97); }
-  .kiosk.recording .rec-btn { background: #8a1717; font-size: clamp(15px, 3vh, 30px); }
+  .kiosk.recording .rec-btn { background: #8a1717;
+             box-shadow: 0 0 0 6px #0a0a0a, 0 8px 40px rgba(138,23,23,0.35);
+             font-size: clamp(15px, 3vh, 30px); }
   .timer { color: #cfc9bf; font-size: clamp(16px, 2.8vh, 30px); font-variant-numeric: tabular-nums;
            letter-spacing: 2px; }
   .error { color: #e67c7c; font-size: clamp(13px, 2vh, 18px); text-align: center; min-height: 1.4em;
            max-width: 460px; }
+
+  /* ---- Camera adjustment screen ---- */
+  .adjust { position: fixed; inset: 0; background: #000; z-index: 60; display: none; }
+  .adjust.show { display: block; }
+  .adjust img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+                transform: scaleX(-1); /* mirror the preview only — recordings stay true orientation */ }
+  .adjust-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+                color: #b9a887; font-size: 22px; text-align: center; padding: 40px; }
+  .adjust-bottom { position: absolute; left: 0; right: 0; bottom: 0;
+                   display: flex; flex-direction: column; align-items: center;
+                   gap: clamp(14px, 3vh, 30px);
+                   padding: clamp(40px, 8vh, 90px) 6vw clamp(24px, 5vh, 56px);
+                   background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.78) 55%); }
+  .adjust-text { color: #fff; font-size: clamp(18px, 3.2vh, 34px); line-height: 1.4;
+                 text-align: center; max-width: 950px;
+                 text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+  .pill-btn { display: flex; align-items: center; gap: 14px; border: none; border-radius: 999px;
+              background: #e63030; color: #fff; font-family: Helvetica, Arial, sans-serif;
+              font-size: clamp(18px, 3.2vh, 32px); font-weight: 700; letter-spacing: 2px;
+              padding: clamp(14px, 2.6vh, 26px) clamp(50px, 9vw, 110px);
+              box-shadow: 0 6px 30px rgba(230,48,48,0.45); cursor: pointer; }
+  .pill-btn:active { transform: scale(0.97); }
+  .pill-dot { width: 0.7em; height: 0.7em; border-radius: 50%; background: #fff; }
 
   /* ---- Countdown overlay ---- */
   .overlay { position: fixed; inset: 0; background: rgba(5,5,5,0.94); z-index: 50;
@@ -100,10 +125,19 @@
     <div class="title" id="eventTitle">Jack &amp; Linda&rsquo;s Golden 50th Anniversary</div>
     <div class="prompt" id="prompt">Leave a video message of your favorite Jack &amp; Linda memory to share with them</div>
     <div class="controls">
-      <button class="rec-btn" id="recBtn">RECORD</button>
+      <button class="rec-btn" id="recBtn">BEGIN</button>
       <div class="timer" id="timer">00:00</div>
       <div class="error" id="error"></div>
     </div>
+  </div>
+</div>
+
+<div class="adjust" id="adjust">
+  <img id="adjustImg" alt="">
+  <div class="adjust-msg" id="adjustMsg">Starting camera&hellip;</div>
+  <div class="adjust-bottom">
+    <div class="adjust-text">Adjust the camera so everyone in your group is visible.<br>Once ready press the Record button.</div>
+    <button class="pill-btn" id="pillRecBtn"><span class="pill-dot"></span>RECORD</button>
   </div>
 </div>
 
@@ -125,6 +159,7 @@
   var kiosk = $('kiosk'), recBtn = $('recBtn'), timerEl = $('timer'), errEl = $('error');
   var overlay = $('overlay'), countEl = $('count'), instructionEl = $('instruction');
   var thanks = $('thanks'), previewImg = $('previewImg'), liveMsg = $('liveMsg');
+  var adjust = $('adjust'), adjustImg = $('adjustImg'), adjustMsg = $('adjustMsg'), pillRecBtn = $('pillRecBtn');
 
   var cfg = {
     promptIdle: $('prompt').textContent,
@@ -184,7 +219,7 @@
     recording = false;
     startedAt = null;
     kiosk.classList.remove('recording');
-    recBtn.textContent = 'RECORD';
+    recBtn.textContent = 'BEGIN';
     $('prompt').textContent = cfg.promptIdle;
     timerEl.textContent = '00:00';
     previewImg.src = '';
@@ -230,19 +265,39 @@
     });
   }
 
+  // ---- Camera adjustment screen ----
+  function showAdjust() {
+    adjustImg.style.display = 'block';
+    adjustMsg.style.display = 'flex';
+    adjustMsg.textContent = 'Starting camera…';
+    adjustImg.onload = function () { adjustMsg.style.display = 'none'; };
+    adjustImg.onerror = function () {
+      adjustImg.style.display = 'none';
+      adjustMsg.style.display = 'flex';
+      adjustMsg.textContent = 'Camera preview unavailable';
+    };
+    adjustImg.src = '/preview.mjpg?t=' + Date.now();
+    adjust.classList.add('show');
+  }
+
+  function hideAdjust() {
+    adjust.classList.remove('show');
+    adjustImg.onload = null;
+    adjustImg.onerror = null;
+    adjustImg.src = '';
+  }
+
   recBtn.addEventListener('click', function () {
     if (busy) return;
     busy = true;
 
     if (!recording) {
-      runCountdown().then(function () {
-        return api('/api/status');
-      }).then(function (st) {
-        if (st.recording) {
-          startedAt = Date.now() - (st.elapsed || 0) * 1000;
-          enterRecordingUI();
+      api('/api/preview/start', { method: 'POST' }).then(function (r) {
+        if (!r.ok) {
+          setError(r.error || 'Could not start the camera');
         } else {
-          setError(st.error || 'Recording did not start — check the server window on the PC.');
+          setError('');
+          showAdjust();
         }
         busy = false;
       }).catch(function () { busy = false; });
@@ -256,11 +311,47 @@
     }
   });
 
+  pillRecBtn.addEventListener('click', function () {
+    if (busy) return;
+    busy = true;
+    hideAdjust();
+
+    // Release the camera first — the recording FFmpeg needs the device, and
+    // the countdown gives it a couple of seconds to be reopened.
+    api('/api/preview/stop', { method: 'POST' }).catch(function () {}).then(function () {
+      return runCountdown();
+    }).then(function () {
+      return api('/api/status');
+    }).then(function (st) {
+      if (st.recording) {
+        startedAt = Date.now() - (st.elapsed || 0) * 1000;
+        enterRecordingUI();
+      } else {
+        setError(st.error || 'Recording did not start — check the server window on the PC.');
+      }
+      busy = false;
+    }).catch(function () { busy = false; });
+  });
+
   // ---- Load config (titles/prompts/photo) from the server ----
   var photoVersion = null;
 
+  // Must match the FONTS list in admin.html
+  var FONTS = {
+    'Playfair Display': "'Playfair Display', Georgia, serif",
+    'Cormorant Garamond': "'Cormorant Garamond', Georgia, serif",
+    'Cinzel': "'Cinzel', Georgia, serif",
+    'Lora': "'Lora', Georgia, serif",
+    'Dancing Script': "'Dancing Script', cursive",
+    'Great Vibes': "'Great Vibes', cursive",
+    'Montserrat': "'Montserrat', Helvetica, Arial, sans-serif",
+    'Helvetica': "Helvetica, Arial, sans-serif",
+  };
+
   function applyConfig(c) {
     if (c.eventTitle) $('eventTitle').textContent = c.eventTitle;
+    if (c.titleFont && FONTS[c.titleFont]) $('eventTitle').style.fontFamily = FONTS[c.titleFont];
+    if (c.titleColor) $('eventTitle').style.color = c.titleColor;
     if (c.dateBanner) $('dateBanner').textContent = c.dateBanner;
     if (c.promptIdle) { cfg.promptIdle = c.promptIdle; if (!recording) $('prompt').textContent = c.promptIdle; }
     if (c.promptRecording) { cfg.promptRecording = c.promptRecording; if (recording) $('prompt').textContent = c.promptRecording; }
@@ -285,6 +376,7 @@
     if (busy) return;
     api('/api/status').then(function (st) {
       if (st.recording && !recording) {
+        hideAdjust();
         startedAt = Date.now() - (st.elapsed || 0) * 1000;
         enterRecordingUI();
       } else if (!st.recording && recording) {
